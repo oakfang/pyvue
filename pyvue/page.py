@@ -1,12 +1,16 @@
 import contextlib as ctx
+from functools import partial
+
+
+def format_tag(template, tag_name, attrs):
+    return template.format(tag_name, ' '.join(['{}="{}"'.format(key.replace('klass', 'class'), val) 
+                                               for (key, val) in attrs.iteritems()]))
 
 
 def tag(tag_name, bufferer):
     @ctx.contextmanager
     def factory(**attrs):
-        bufferer._buffer += '<{} {}>'.format(tag_name,
-                                             ' '.join(['{}="{}"'.format(key.replace('klass', 'class'), val) 
-                                                       for (key, val) in attrs.iteritems()]))
+        bufferer._buffer += format_tag('<{} {}>', tag_name, attrs)
         yield
         bufferer._buffer += '</{}>'.format(tag_name)
     return factory
@@ -17,23 +21,20 @@ class Page(object):
         self._buffer = ''
 
     def __getattr__(self, attr):
-        try:
-            if attr in ('input', 'img', 'hr'):
-                return lambda **attrs: self._self_closing_tag(attr, **attrs)
-            return object.__getattr__(self, attr)
-        except AttributeError:
-            return tag(attr, self)
-
-    def text(self, t):
-        self._buffer += str(t)
-
-    def _self_closing_tag(self, tag_name, **attrs):
-        self._buffer += '<{} {}/>'.format(tag_name,
-                                          ' '.join(['{}="{}"'.format(key.replace('klass', 'class'), val) 
-                                                    for (key, val) in attrs.iteritems()]))
+        if attr.startswith('_') or attr == 'text': 
+            return super(Page, self).__getattr__(self, attr)
+        elif attr in ('input', 'img', 'hr'):
+            return partial(self._self_closing_tag, attr)
+        return tag(attr, self)
 
     def __str__(self):
         return self._buffer
+
+    def _self_closing_tag(self, tag_name, **attrs):
+        self._buffer += format_tag('<{} {}/>', tag_name, attrs)
+
+    def text(self, t):
+        self._buffer += str(t)
 
 
 def view(f):
