@@ -66,7 +66,8 @@ def handle_tokens(args_map):
 
 def tokenize_args(line):
     args_map = {}
-    tokenize.tokenize(sio(line).readline, handle_tokens(args_map))
+    if line:
+        tokenize.tokenize(sio(line).readline, handle_tokens(args_map))
     return args_map
 
 
