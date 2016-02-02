@@ -37,10 +37,52 @@ Notes:
   the openning tag.
 """
 import re
+import tokenize
+from cStringIO import StringIO as sio
 
 
 VIEW_RE = re.compile('^(\s*view \w+\(.*?\):(.|\n)*?\r?\n\s*)(\n|$)', re.MULTILINE)
 VIEW_HEADER_RE = re.compile('(\s*)view (\w+)\((.*?)\):')
+
+
+def handle_tokens(args_map):
+    state = {
+        'recording': False,
+        'toks': []
+    }
+    def handler(ttype, value, _, __, ___):
+        if ttype == tokenize.OP and value == '=':
+            recording_for = state['toks'].pop()
+            if state['toks']:
+                args_map[state['recording']] = ' '.join(state['toks'])
+            state['recording'] = recording_for
+            state['toks'] = []
+        elif ttype == tokenize.ENDMARKER:
+            args_map[state['recording']] = ' '.join(state['toks'])
+        else:
+            state['toks'].append(value)
+    return handler
+
+
+def tokenize_args(line):
+    args_map = {}
+    tokenize.tokenize(sio(line).readline, handle_tokens(args_map))
+    return args_map
+
+
+def replace_args(has_block, self_closing=False):
+    def handler(match):
+        template = ('{space}with __p.{tag}(**dict({args})):{block}' 
+                    if not self_closing 
+                    else '{space}__p.{tag}(**dict({args}))')
+        return template.format(space=match.group(1),
+                                tag=match.group(2),
+                                args=', '.join([
+                                  '{key}={val}'.format(key=key, val=val)
+                                  for (key, val) 
+                                  in tokenize_args(match.group(3)).iteritems()]),
+                                block=match.group(4) if has_block else ' pass')
+    return handler
 
 
 def view_parser(content):
@@ -52,11 +94,11 @@ def view_parser(content):
     for view_block in [res[0] for res in VIEW_RE.findall(content)]:
         block = VIEW_HEADER_RE.sub(r'\1@view\n\1def \2(__p, \3):', view_block)
         block = re.sub(r'\<py\>((.|\n)*?)\</py\>', r'__p.text(\1)', block)
-        block = re.sub(r'^(\s*)?\<([a-zA-Z0-9_]+)\s?(.*?)\>\s*</\2\>', r'\1with __p.\2(\3): pass', block, flags=re.M)
-        temp = re.sub(r'^(\s*)?\<([a-zA-Z0-9_]+)\s?(.*?)\>((.|\n)*?)\1\</\2\>', r'\1with __p.\2(\3):\4', block, flags=re.M)
+        block = re.sub(r'^(\s*)?\<([a-zA-Z0-9_]+)\s?(.*?)\>\s*</\2\>', replace_args(False), block, flags=re.M)
+        temp = re.sub(r'^(\s*)?\<([a-zA-Z0-9_]+)\s?(.*?)\>((.|\n)*?)\1\</\2\>', replace_args(True), block, flags=re.M)
         while temp != block:
             block = temp
-            temp = re.sub(r'^(\s*)?\<([a-zA-Z0-9_]+)\s?(.*?)\>((.|\n)*?)\1\</\2\>', r'\1with __p.\2(\3):\4', block, flags=re.M)
-        block = re.sub(r'^(\s*)?<(\w+)\s?(.*?)\/\>\s*$', r'\1__p.\2(\3)', block, flags=re.M)
+            temp = re.sub(r'^(\s*)?\<([a-zA-Z0-9_]+)\s?(.*?)\>((.|\n)*?)\1\</\2\>', replace_args(True), block, flags=re.M)
+        block = re.sub(r'^(\s*)?<(\w+)\s?(.*?)\/\>\s*$', replace_args(False, True), block, flags=re.M)
         content = content.replace(view_block, block)
     return content
