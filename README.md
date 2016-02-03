@@ -105,6 +105,88 @@ print index_page("Index", component(xrange(10)))
 # exactly the same output :)
 ```
 
+### Resuable Components
+Okay, so you can write renderable views. That's awesome,
+but you want to use some of your views as reusable components, the way God intended.
+
+The solution is easy enough: `yield`.
+
+`yield`ing at any point inside a view will make it a `component view`.
+
+#### What is a `component view` and how is it different than a regular `view`?
+A `view` is a function that returns a string, which represents a rendered page.
+
+A `component view` is added to the list of HTML tags every `Page` object recongnises,
+and can be used as a context manager, just like `div` or `span` with one special difference:
+
+The "attributes" passed to a `component view` are actually his function parameters
+(again, the first `Page` parameter is implicit).
+
+However, a `component view` **cannot** be rendered as a `view`.
+
+Example:
+
+```python
+@view
+def component(p, text):
+    with p.span():
+        p.text(text)
+    yield # make this a component. Every alteration of the Page occuring in this context will happen here.
+    
+
+@view
+def scope(p):
+    with p.div():
+        yield # make this a component. Every alteration of the Page occuring in this context will happen here.
+    with p.div():
+        with p.span():
+            p.text('End of component')
+
+
+@view
+def main(p):
+    with p.scope():
+        with p.component('Hello!'): pass
+
+
+main() # will render
+scope() # will raise NoneType non-callable exception
+```
+
+Obviously, since .pyv syntax allows for arbitrary python code,
+simply `yield`ing anywhere inside a `view` will be sufficient.
+
+Afterwards, using a component as a tag is perfectly okay:
+
+```python
+view component(text):
+    <span>
+        <py>text</py>
+    </span>
+    yield
+
+
+view scope():
+    <div>
+        yield
+    </div>
+    <div>
+        <span>
+            <py>'End of component'</py>
+        </span>
+    </div>
+
+
+view main():
+    <scope>
+        <component text='hello!'></component>
+    </scope>
+
+
+main() # will render
+scope() # will raise NoneType non-callable exception
+```
+
 ### Transpiling .pyv files
 
 ```python
