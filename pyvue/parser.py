@@ -103,3 +103,17 @@ def view_parser(content):
         block = re.sub(r'^(\s*)?<(\w+)\s?(.*?)\/\>\s*$', replace_args(False, True), block, flags=re.M)
         content = content.replace(view_block, block)
     return content
+
+
+def compile_file():
+    """
+    Parse a file and print the generated python code
+    """
+    from sys import argv, exit
+    if len(argv) < 2:
+        print 'Usage: {} <file_path>'.format(argv[0])
+        exit(1)
+
+    file_path = argv[1]
+    with open(file_path) as pyv_file:
+        print view_parser(pyv_file.read() + '\n')

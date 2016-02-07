@@ -189,6 +189,14 @@ scope() # will raise NoneType non-callable exception
 
 ### Transpiling .pyv files
 
+#### Using the commandline
+
+```
+pyvuec ./foo.pyv > foo.py
+```
+
+#### Using the parser directly
+
 ```python
 from pyvue import view_parser
 
@@ -196,8 +204,7 @@ with open('foo.pyv') as pyv:
     open('foo.py', 'wb').write(view_parser(pyv.read()))
 ```
 
-Or, using [facade](http://github.com/oakfang/facade),
-you can import them directly, using the pyv loader:
+#### Using [facade](http://github.com/oakfang/facade)
 
 ```python
 from facade import pyv
