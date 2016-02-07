@@ -35,6 +35,10 @@ class Page(object):
     """
     Create a page buffer.
     """
+    SELF_CLOSING = ('area', 'base', 'br', 'col', 'command', 'embed', 
+                    'hr', 'img', 'input', 'keygen', 'link', 'meta',
+                    'param', 'source', 'track', 'wbr')
+
     custom_elements = {}
 
     @classmethod
@@ -50,7 +54,7 @@ class Page(object):
         """
         if attr.startswith('_') or attr == 'text': 
             return super(Page, self).__getattr__(self, attr)
-        elif attr in ('input', 'img', 'hr'):
+        elif attr.lower() in Page.SELF_CLOSING:
             return partial(self._self_closing_tag, attr)
         elif attr in self.custom_elements:
             return partial(self.custom_elements[attr], self)
